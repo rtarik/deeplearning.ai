@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from dnn_utils_v2 import sigmoid, sigmoid_backward, relu, relu_backward
 
 def initialize_parameters_deep(layer_dims):
@@ -114,7 +115,7 @@ def linear_backward(dZ, cache):
     A_prev, W, b = cache
     m = A_prev.shape[1]
     dW = np.dot(dZ, A_prev.T) / m
-    db = np.mean(dZ, axis=1)
+    db = np.mean(dZ, axis=1, keepdims=True)
     dA_prev = np.dot(W.T, dZ)
     return dA_prev, dW, db
 
@@ -196,7 +197,39 @@ def update_parameters(parameters, grads, learning_rate):
         updated_params["b" + str(l)] = bl
     return updated_params
 
-
+def L_layer_model(X, Y, layers_dims, learning_rate = 0.0075, num_iterations = 3000, print_cost=False):
+    """
+    Implements a L-layer neural network: [LINEAR->RELU]*(L-1)->LINEAR->SIGMOID.
+    
+    Arguments:
+    X -- data, numpy array of shape (number of examples, num_px * num_px * 3)
+    Y -- true "label" vector (containing 0 if cat, 1 if non-cat), of shape (1, number of examples)
+    layers_dims -- list containing the input size and each layer size, of length (number of layers + 1).
+    learning_rate -- learning rate of the gradient descent update rule
+    num_iterations -- number of iterations of the optimization loop
+    print_cost -- if True, it prints the cost every 100 steps
+    
+    Returns:
+    parameters -- parameters learnt by the model. They can then be used to predict.
+    """
+    parameters = initialize_parameters_deep(layers_dims)
+    costs = []
+    for i in range(num_iterations):
+        A, caches = L_model_forward(X, parameters)
+        gradients = L_model_backward(A, Y, caches)
+        parameters = update_parameters(parameters, gradients, learning_rate)
+        if print_cost and i % 100 == 0:
+            cost = compute_cost(A, Y)
+            print ("Cost after iteration %i: %f" %(i, cost))
+            costs.append(cost)
+    if print_cost:
+        plt.plot(np.squeeze(costs))
+        plt.ylabel('cost')
+        plt.xlabel('iterations (per tens)')
+        plt.title("Learning rate =" + str(learning_rate))
+        plt.show()
+    return parameters
+        
     
     
 
