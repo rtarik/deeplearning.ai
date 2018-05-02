@@ -95,6 +95,102 @@ def pool_forward(A_prev, hparameters, mode = "max"):
                         A[i, h, w, c] = np.mean(A_slice_prev)
     cache = (A_prev, hparameters)
     return A, cache
+
+def conv_backward(dZ, cache):
+    """
+    Implement the backward propagation for a convolution function
+    
+    Arguments:
+    dZ -- gradient of the cost with respect to the output of the conv layer (Z), numpy array of shape (m, n_H, n_W, n_C)
+    cache -- cache of values needed for the conv_backward(), output of conv_forward()
+    
+    Returns:
+    dA_prev -- gradient of the cost with respect to the input of the conv layer (A_prev),
+               numpy array of shape (m, n_H_prev, n_W_prev, n_C_prev)
+    dW -- gradient of the cost with respect to the weights of the conv layer (W)
+          numpy array of shape (f, f, n_C_prev, n_C)
+    db -- gradient of the cost with respect to the biases of the conv layer (b)
+          numpy array of shape (1, 1, 1, n_C)
+    """
+    A_prev, W, b, hparameters = cache
+    m, n_H, n_W, n_C = dZ.shape
+    f = W.shape[0]
+    pad = hparameters["pad"]
+    stride = hparameters["stride"]
+    _, n_H_prev, n_W_prev, n_C_prev = A_prev.shape
+    dA_prev = np.zeros((m, n_H_prev, n_W_prev, n_C_prev))
+    A_prev_pad = zero_pad(A_prev, pad)
+    dA_prev_pad = zero_pad(dA_prev, pad)
+    dW = np.zeros((f, f, n_C_prev, n_C))
+    db = np.zeros((1, 1, 1, n_C))
+    for i in range(m):
+        for h in range(n_H):
+            for w in range(n_W):
+                for c in range(n_C):
+                    dA_prev_pad[i, h*stride:h*stride+f, w*stride:w*stride+f, :] += W[:, :, :, c] * dZ[i, h, w, c]
+                    dW[:, :, :, c] += A_prev_pad[i, h*stride:h*stride+f, w*stride:w*stride+f, :] * dZ[i, h, w, c]
+                    db[:, :, :, c] += dZ[i, h, w, c]
+    dA_prev = dA_prev_pad[:, pad:-pad, pad:-pad, :]             
+    return dA_prev, dW, db
+
+def create_mask_from_window(x):
+    """
+    Creates a mask from an input matrix x, to identify the max entry of x.
+    
+    Arguments:
+    x -- Array of shape (f, f)
+    
+    Returns:
+    mask -- Array of the same shape as window, contains a True at the position corresponding to the max entry of x.
+    """
+    return x == np.max(x)
+
+def distribute_value(dz, shape):
+    """
+    Distributes the input value in the matrix of dimension shape
+    
+    Arguments:
+    dz -- input scalar
+    shape -- the shape (n_H, n_W) of the output matrix for which we want to distribute the value of dz
+    
+    Returns:
+    a -- Array of size (n_H, n_W) for which we distributed the value of dz
+    """
+    n_H, n_W = shape
+    average = dz / (n_H * n_W)
+    return np.ones((n_H, n_W)) * average
+
+def pool_backward(dA, cache, mode = "max"):
+    """
+    Implements the backward pass of the pooling layer
+    
+    Arguments:
+    dA -- gradient of cost with respect to the output of the pooling layer, same shape as A
+    cache -- cache output from the forward pass of the pooling layer, contains the layer's input and hparameters 
+    mode -- the pooling mode you would like to use, defined as a string ("max" or "average")
+    
+    Returns:
+    dA_prev -- gradient of cost with respect to the input of the pooling layer, same shape as A_prev
+    """
+    A_prev, hparameters = cache
+    f = hparameters["f"]
+    stride = hparameters["stride"]
+    dA_prev = np.zeros(A_prev.shape)
+    m, n_H, n_W, n_C = dA.shape
+    for i in range(m):
+        for h in range(n_H):
+            for w in range(n_W):
+                for c in range(n_C):
+                    a_slice_prev = A_prev[i, h*stride:h*stride+f, w*stride:w*stride+f, c]
+                    if mode == "max":
+                        mask = create_mask_from_window(a_slice_prev)
+                        dA_prev[i, h*stride:h*stride+f, w*stride:w*stride+f, c] += dA[i, h, w, c] * mask
+                    elif mode == "average":
+                        dA_prev[i, h*stride:h*stride+f, w*stride:w*stride+f, c] += distribute_value(dA[i, h, w, c], (f, f))                    
+    return dA_prev
+    
+    
+    
     
     
     
